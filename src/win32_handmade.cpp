@@ -1,7 +1,79 @@
 #include <windows.h>
 
+#define internal static
+#define local_persist static
+#define global_variable static
+
+//global
+global_variable bool Running;
+global_variable BITMAPINFO BitmapInfo;
+global_variable void *BitmapMemory;
+global_variable HBITMAP BitmapHandle;
+global_variable HDC BitmapDeviceContext;
+
+//Device - Independent Bitmaps
+internal void Win32ResizeDIBSection(int Width, int Height)
+{
+	if (BitmapHandle)
+	{
+		/*
+		The DeleteObject function deletes a logical pen, brush, font, bitmap, 
+		region, or palette, freeing all system resources associated with the 
+		object. 
+		*/
+		DeleteObject(BitmapHandle);
+	}
+	
+	if (BitmapDeviceContext != 0)
+	{
+		/*
+		The CreateCompatibleDC function creates a memory device context (DC) 
+		compatible with the specified device.
+		*/
+		BitmapDeviceContext = CreateCompatibleDC(0);
+		
+	}
+	/*
+	The BITMAPINFOHEADER structure contains information about 
+	the dimensions and color format of a DIB.
+	*/
+	BitmapInfo.bmiHeader.biSize = sizeof(BitmapInfo.bmiHeader);
+	BitmapInfo.bmiHeader.biWidth = Width;
+	BitmapInfo.bmiHeader.biHeight = Height;
+	BitmapInfo.bmiHeader.biPlanes = 1;
+	BitmapInfo.bmiHeader.biBitCount = 32;
+	BitmapInfo.bmiHeader.biCompression = BI_RGB;
+	
+	/*
+	The CreateDIBSection function creates a DIB that 
+	applications can write to directly.
+	*/
+	BitmapHandle = CreateDIBSection(
+		BitmapDeviceContext,
+		&BitmapInfo,
+		DIB_RGB_COLORS,
+		&BitmapMemory,
+		0,0);
+}
+
+internal void Win32UpdateWindow(HDC DeviceContext, int x, int y, int Width, int Height)
+{
+	/*
+	The StretchDIBits function copies the color data for a rectangle of pixels in
+	a DIB, JPEG, or PNG image to the specified destination rectangle. 
+	*/
+	StretchDIBits(
+		DeviceContext,
+		x, y, Width, Height,
+		x, y, Width, Height,
+		BitmapMemory,
+		&BitmapInfo,
+		DIB_RGB_COLORS,
+		SRCCOPY);
+}
+
 //WindowProc callback function
-LRESULT CALLBACK WindowCallback( 
+LRESULT CALLBACK Win32WindowCallback( 
 	HWND   Window, // handle to the window
 	UINT   Message,
 	WPARAM wParam,
@@ -14,16 +86,26 @@ LRESULT CALLBACK WindowCallback(
 		//Window Notifications
 		case WM_SIZE:
 		{
+			
+			RECT ClientRect;
+			// Retrieves the coordinates of a window's client area
+			GetClientRect(Window, &ClientRect); 
+			int Width = ClientRect.right - ClientRect.left;
+			int Height = ClientRect.bottom - ClientRect.top;
+			Win32ResizeDIBSection(Width, Height);
 			OutputDebugStringA("wm_size\n");//OutputDebugStringA display to debug window
 		}break;
 
 		case WM_DESTROY:
 		{
+			Running = false;
 			OutputDebugStringA("wm_destroy\n");
 		}break;
 
 		case WM_CLOSE:
 		{
+			Running = false;
+			PostQuitMessage(0);
 			OutputDebugStringA("wm_close\n");
 		}break;
 
@@ -45,18 +127,9 @@ LRESULT CALLBACK WindowCallback(
 			int y = Paint.rcPaint.top;
 			int Width = Paint.rcPaint.right - Paint.rcPaint.left;
 			int Height = Paint.rcPaint.bottom - Paint.rcPaint.top;
-			static DWORD Operation = WHITENESS;
-			PatBlt(DeviceContext, x, y, Width, Height, Operation);
+			Win32UpdateWindow(DeviceContext, x, y, Width, Height);
 			EndPaint(Window, &Paint);
 
-			if (Operation == WHITENESS)
-			{
-				Operation = BLACKNESS;
-			}
-			else
-			{
-				Operation = WHITENESS;
-			}
 		}break;
 
 		default:
@@ -79,7 +152,7 @@ int CALLBACK WinMain(
 	WNDCLASS WindowClass = {};
 
 	WindowClass.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-	WindowClass.lpfnWndProc = WindowCallback;
+	WindowClass.lpfnWndProc = Win32WindowCallback;
 	WindowClass.hInstance = hInstance;
 	//WindowClass.hIcon;
 	WindowClass.lpszClassName = "HandmadeHeroWindowsClass";
@@ -103,8 +176,9 @@ int CALLBACK WinMain(
 				0);
 		if (WindowHandle != NULL)
 		{
+			Running = true;
 			MSG Message;
-			for (;;)
+			while (Running)
 			{
 				BOOL MessageResult = GetMessage(&Message, 0, 0, 0);
 
