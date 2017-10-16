@@ -306,16 +306,18 @@ int CALLBACK WinMain(
 	LPSTR     lpCmdLine,
 	int       nCmdShow)
 {
+	win32LoadXinput();
+	
 	//WNDCLASS structure
-	WNDCLASS WindowClassA = {};
+	WNDCLASS WindowClass = {};
 
 	Win32ResizeDIBSection(&GlobalBackBuffer, 1280, 720);
 
-	WindowClassA.style = CS_HREDRAW | CS_VREDRAW ;
-	WindowClassA.lpfnWndProc = Win32WindowCallback;
-	WindowClassA.hInstance = hInstance;
+	WindowClass.style = CS_HREDRAW | CS_VREDRAW ;
+	WindowClass.lpfnWndProc = Win32WindowCallback;
+	WindowClass.hInstance = hInstance;
 	//WindowClass.hIcon;
-	WindowClassA.lpszClassName = "HandmadeHeroWindowsClass";
+	WindowClass.lpszClassName = "HandmadeHeroWindowsClass";
 
 	// CreateWindowEx function
 	if (RegisterClass(&WindowClassA))
