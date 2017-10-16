@@ -1,5 +1,8 @@
 #include <windows.h>
 #include <stdint.h>
+#include <xinput.h>
+#include <stdio.h>
+//#include <XInput.h>
 
 typedef int8_t int8;
 typedef int16_t int16;
@@ -36,7 +39,46 @@ struct win32WindowDimension
 global_variable bool Running;
 global_variable win32OffScreenBuffer GlobalBackBuffer;
 
-win32WindowDimension getWindowDimension(HWND Window)
+//-------------XinputGetState------------
+#define X_INPUT_GET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE *pState)
+typedef X_INPUT_GET_STATE(x_input_get_state);
+X_INPUT_GET_STATE(XInputGetStateStub)
+{
+	return (0);
+}
+global_variable x_input_get_state *XInputGetState_ = XInputGetStateStub;
+#define XInputGetState XInputGetState_
+
+//-------------XinputSetState------------
+#define X_INPUT_SET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_VIBRATION *pVibration)
+typedef X_INPUT_SET_STATE(x_input_set_state);
+X_INPUT_SET_STATE(XInputSetStateStub)
+{
+	return (0);
+}
+global_variable x_input_set_state *XInputSetState_ = XInputSetStateStub;
+#define XInputSetState XInputSetState_
+
+internal void win32LoadXinput(void)
+{
+	/*
+	LoadLibrary
+	Loads the specified module into the address space of the calling process.
+	*/
+	HMODULE XInputLibrary = LoadLibraryA("xinput1_4.dll");
+	if (XInputLibrary)
+	{
+		/*
+		GetProcAddress
+		Retrieves the address of an exported function or variable from the specified 
+		dynamic-link library (DLL).
+		*/
+		XInputGetState = (x_input_get_state *)GetProcAddress(XInputLibrary, "XInputGetState");
+		XInputSetState = (x_input_set_state *)GetProcAddress(XInputLibrary, "XInputSetState");
+	}
+}
+
+internal win32WindowDimension getWindowDimension(HWND Window)
 {
 	win32WindowDimension Result;
 
@@ -50,15 +92,15 @@ win32WindowDimension getWindowDimension(HWND Window)
 }
 
 internal void RenderWeirdGradient(
-	win32OffScreenBuffer Buffer, int BlueOffSet, int GreenOffSet)
+	win32OffScreenBuffer *Buffer, int BlueOffSet, int GreenOffSet)
 {
 
-	uint8 *Row = (uint8 *)Buffer.Memory;
+	uint8 *Row = (uint8 *)Buffer->Memory;
 
-	for (int y = 0; y < Buffer.Height; ++y)
+	for (int y = 0; y < Buffer->Height; ++y)
 	{
 		uint32 *Pixel = (uint32 *)Row;
-		for (int x = 0; x < Buffer.Width; ++x)
+		for (int x = 0; x < Buffer->Width; ++x)
 		{
 			uint8 Blue = (x + BlueOffSet);
 
@@ -71,7 +113,7 @@ internal void RenderWeirdGradient(
 			//*Pixel++ = ((Red << 16) | (Green << 8) | Blue);
 		}
 
-		Row += Buffer.Pitch;
+		Row += Buffer->Pitch;
 	}
 }
 
@@ -108,9 +150,8 @@ internal void Win32ResizeDIBSection(win32OffScreenBuffer *Buffer,
 	//RenderWeirdGradient(128, 0);
 }
 
-internal void Win32UpdateWindow(HDC DeviceContext, 
-	int WindowWidth, int WindowHeight, win32OffScreenBuffer Buffer, 
-	int x, int y, int Width, int Height)
+internal void Win32UpdateWindow(win32OffScreenBuffer *Buffer, HDC DeviceContext,
+								int WindowWidth, int WindowHeight)
 {
 
 	/*
@@ -120,9 +161,9 @@ internal void Win32UpdateWindow(HDC DeviceContext,
 	StretchDIBits(
 		DeviceContext,
 		0, 0, WindowWidth, WindowHeight,
-		0, 0, Buffer.Width, Buffer.Height,
-		Buffer.Memory,
-		&Buffer.Info,
+		0, 0, Buffer->Width, Buffer->Height,
+		Buffer->Memory,
+		&Buffer->Info,
 		DIB_RGB_COLORS,
 		SRCCOPY);
 }
@@ -162,6 +203,73 @@ LRESULT CALLBACK Win32WindowCallback(
 			OutputDebugStringA("wm_activateapp\n");
 		}break;
 
+		case WM_SYSKEYUP:
+		case WM_SYSKEYDOWN:
+		case WM_KEYDOWN:
+		case WM_KEYUP:
+		{
+			//VK = Virtual Key Codes
+			uint32 VKCode = wParam;
+			bool WasDown = ((lParam & (1 << 30)) != 0);
+			bool IsDown = ((lParam & (1 << 31)) == 0);
+
+			if (WasDown != IsDown)
+			{
+				if (VKCode == 'W')
+				{
+
+				}
+				else if (VKCode == 'A')
+				{
+
+				}
+				else if (VKCode == 'S')
+				{
+
+				}
+				else if (VKCode == 'D')
+				{
+
+				}
+				else if (VKCode == 'Q')
+				{
+
+				}
+				else if (VKCode == 'E')
+				{
+
+				}
+				else if (VKCode == VK_UP)
+				{
+
+				}
+				else if (VKCode == VK_LEFT)
+				{
+
+				}
+				else if (VKCode == VK_DOWN)
+				{
+
+				}
+				else if (VKCode == VK_RIGHT)
+				{
+
+				}
+				else if (VKCode == VK_ESCAPE)
+				{
+					OutputDebugStringA("ESCAPE\n");
+					if (IsDown)
+					{
+						OutputDebugStringA("IsDown\n");
+					}
+					if (WasDown)
+					{
+						OutputDebugStringA("WasDown\n");
+					}
+				}
+			}
+		}break;
+
 		case WM_PAINT:
 		{
 			/*
@@ -177,8 +285,7 @@ LRESULT CALLBACK Win32WindowCallback(
 			int Height = Paint.rcPaint.bottom - Paint.rcPaint.top;
 			
 			win32WindowDimension Dimension = getWindowDimension(Window);
-			Win32UpdateWindow(DeviceContext, Dimension.Width, Dimension.Height,
-								GlobalBackBuffer, x, y, Width, Height);
+			Win32UpdateWindow(&GlobalBackBuffer, DeviceContext, Dimension.Width, Dimension.Height);
 			EndPaint(Window, &Paint);
 
 		}break;
@@ -200,23 +307,23 @@ int CALLBACK WinMain(
 	int       nCmdShow)
 {
 	//WNDCLASS structure
-	WNDCLASS WindowClass = {};
+	WNDCLASS WindowClassA = {};
 
 	Win32ResizeDIBSection(&GlobalBackBuffer, 1280, 720);
 
-	WindowClass.style = CS_HREDRAW | CS_VREDRAW ;
-	WindowClass.lpfnWndProc = Win32WindowCallback;
-	WindowClass.hInstance = hInstance;
+	WindowClassA.style = CS_HREDRAW | CS_VREDRAW ;
+	WindowClassA.lpfnWndProc = Win32WindowCallback;
+	WindowClassA.hInstance = hInstance;
 	//WindowClass.hIcon;
-	WindowClass.lpszClassName = "HandmadeHeroWindowsClass";
+	WindowClassA.lpszClassName = "HandmadeHeroWindowsClass";
 
 	// CreateWindowEx function
-	if (RegisterClass(&WindowClass))
+	if (RegisterClass(&WindowClassA))
 	{
 		HWND Window =
 			CreateWindowEx(
-				0,							//Extended Window Styles
-				WindowClass.lpszClassName,
+				0,						//Extended Window Styles
+				WindowClassA.lpszClassName,
 				"Handmade Hero",			//Title 
 				WS_OVERLAPPEDWINDOW|WS_VISIBLE,
 				CW_USEDEFAULT,				//x position
@@ -248,16 +355,57 @@ int CALLBACK WinMain(
 					TranslateMessage(&Message);
 					DispatchMessage(&Message);
 				}
-				RenderWeirdGradient(GlobalBackBuffer, BlueOffSet, GreenOffSet);
+
+				//XInput
+				//used to determine if the controller is connected. 
+				for (DWORD ControllerIndex = 0; ControllerIndex< XUSER_MAX_COUNT; ++ControllerIndex)
+				{
+					XINPUT_STATE ControllerState;
+					if (XInputGetState(ControllerIndex, &ControllerState) == ERROR_SUCCESS)
+					{
+						//Controller connected
+
+						//XINPUT_GAMEPAD structure
+						XINPUT_GAMEPAD *Pad = &ControllerState.Gamepad;
+
+						//device digital buttons
+						bool Up = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_UP);
+						bool Down = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN);
+						bool Left = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_LEFT);
+						bool Right = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT);
+						bool Start = (Pad->wButtons & XINPUT_GAMEPAD_START);
+						bool Back = (Pad->wButtons & XINPUT_GAMEPAD_BACK);
+						bool LeftShoulder = (Pad->wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER);
+						bool RightShoulder = (Pad->wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER);
+						bool AButton = (Pad->wButtons & XINPUT_GAMEPAD_A);
+						bool BButton = (Pad->wButtons & XINPUT_GAMEPAD_B);
+						bool XButton = (Pad->wButtons & XINPUT_GAMEPAD_X);
+						bool YButton = (Pad->wButtons & XINPUT_GAMEPAD_Y);
+
+
+						int16 StickX = Pad->sThumbLX; //Left thumbstick x-axis value
+						int16 StickY = Pad->sThumbLY; //Left thumbstick x-axis value
+						
+						if (BButton)
+						{
+							GreenOffSet += 2;
+						}
+					}
+					else
+					{
+						//not connected
+
+					}
+				}
+				RenderWeirdGradient(&GlobalBackBuffer, BlueOffSet, GreenOffSet);
 				HDC DeviceContext = GetDC(Window);
 				win32WindowDimension Dimension = getWindowDimension(Window);
 
-				Win32UpdateWindow(DeviceContext, Dimension.Width, Dimension.Height,
-					GlobalBackBuffer ,0, 0, Dimension.Width, Dimension.Height);
+				Win32UpdateWindow(&GlobalBackBuffer, DeviceContext, Dimension.Width, Dimension.Height);
 				ReleaseDC(Window, DeviceContext);
 
 				++BlueOffSet;
-				++GreenOffSet;
+				//++GreenOffSet;
 			}
 		}
 		else
