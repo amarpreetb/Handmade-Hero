@@ -143,7 +143,7 @@ internal void Win32InitDSound(HWND Window, int32 SamplesPerSecond, int32 BufferS
 				The CreateSoundBuffer method creates a sound buffer object to 
 				manage audio samples.
 				*/
-				LPDIRECTSOUND3DBUFFER PrimaryBuffer;
+				LPDIRECTSOUNDBUFFER PrimaryBuffer;
 				if (SUCCEEDED(DirectSound->CreateSoundBuffer(&BufferDescription, &PrimaryBuffer, 0)))
 				{
 					
@@ -177,7 +177,7 @@ internal void Win32InitDSound(HWND Window, int32 SamplesPerSecond, int32 BufferS
 			The CreateSoundBuffer method creates a sound buffer object to
 			manage audio samples.
 			*/
-			LPDIRECTSOUND3DBUFFER SecondaryBuffer;
+			LPDIRECTSOUNDBUFFER SecondaryBuffer;
 			if (SUCCEEDED(DirectSound->CreateSoundBuffer(&BufferDescription, &SecondaryBuffer, 0)))
 			{
 
