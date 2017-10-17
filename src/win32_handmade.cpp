@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <stdint.h>
 #include <xinput.h>
+#include <dsound.h>
 #include <stdio.h>
 //#include <XInput.h>
 
@@ -9,6 +10,7 @@ typedef int16_t int16;
 typedef int32_t int32;
 typedef int64_t int64;
 
+typedef int32 bool32;
 
 typedef uint8_t uint8;
 typedef uint16_t uint16;
@@ -44,7 +46,7 @@ global_variable win32OffScreenBuffer GlobalBackBuffer;
 typedef X_INPUT_GET_STATE(x_input_get_state);
 X_INPUT_GET_STATE(XInputGetStateStub)
 {
-	return (0);
+	return (ERROR_DEVICE_NOT_CONNECTED);
 }
 global_variable x_input_get_state *XInputGetState_ = XInputGetStateStub;
 #define XInputGetState XInputGetState_
@@ -54,10 +56,14 @@ global_variable x_input_get_state *XInputGetState_ = XInputGetStateStub;
 typedef X_INPUT_SET_STATE(x_input_set_state);
 X_INPUT_SET_STATE(XInputSetStateStub)
 {
-	return (0);
+	return (ERROR_DEVICE_NOT_CONNECTED);
 }
 global_variable x_input_set_state *XInputSetState_ = XInputSetStateStub;
 #define XInputSetState XInputSetState_
+
+//direct sound
+#define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name( LPCGUID pcGuidDevice, LPDIRECTSOUND *ppDS, LPUNKNOWN pUnkOuter);
+typedef DIRECT_SOUND_CREATE(direct_sound_create);
 
 internal void win32LoadXinput(void)
 {
@@ -66,6 +72,10 @@ internal void win32LoadXinput(void)
 	Loads the specified module into the address space of the calling process.
 	*/
 	HMODULE XInputLibrary = LoadLibraryA("xinput1_4.dll");
+	if (!XInputLibrary)
+	{
+		XInputLibrary = LoadLibraryA("xinput1_3.dll");
+	}
 	if (XInputLibrary)
 	{
 		/*
@@ -74,7 +84,113 @@ internal void win32LoadXinput(void)
 		dynamic-link library (DLL).
 		*/
 		XInputGetState = (x_input_get_state *)GetProcAddress(XInputLibrary, "XInputGetState");
+		if (!XInputGetState)
+		{
+			XInputGetState = XInputGetStateStub;
+		}
+
 		XInputSetState = (x_input_set_state *)GetProcAddress(XInputLibrary, "XInputSetState");
+		if (!XInputSetState)
+		{
+			XInputSetState = XInputSetStateStub;
+		}
+	}
+}
+
+/*
+DirectSoundCreate
+This function creates and initializes an IDirectSound interface.
+*/
+internal void Win32InitDSound(HWND Window, int32 SamplesPerSecond, int32 BufferSize)
+{
+	HMODULE DSoundLibrary = LoadLibraryA("dsound.dll");
+	if (DSoundLibrary)
+	{
+		direct_sound_create *DirectSoundCreate = (direct_sound_create *)
+			GetProcAddress(DSoundLibrary, "DirectSoundCreate");
+
+		LPDIRECTSOUND DirectSound;
+		if (DirectSoundCreate && SUCCEEDED(DirectSoundCreate(0, &DirectSound, 0)))
+		{
+
+			if (SUCCEEDED(DirectSound->SetCooperativeLevel(Window, DSSCL_PRIORITY)))
+			{
+				/*
+				WAVEFORMATEX Structure
+				The WAVEFORMATEX structure defines the format
+				of waveform-audio data.
+				*/
+				WAVEFORMATEX WaveFormat;
+				WaveFormat.wFormatTag = WAVE_FORMAT_PCM;
+				WaveFormat.nChannels = 2;
+				WaveFormat.nSamplesPerSec = SamplesPerSecond;
+				WaveFormat.wBitsPerSample = 16;
+				WaveFormat.nBlockAlign = (WaveFormat.nChannels * WaveFormat.wBitsPerSample) / 8;
+				WaveFormat.nAvgBytesPerSec = WaveFormat.nSamplesPerSec * WaveFormat.nBlockAlign;
+				WaveFormat.cbSize = 0;
+
+				/*
+				The DSBUFFERDESC structure describes the characteristics of a 
+				new buffer object. It is used by the 
+				IDirectSound8::CreateSoundBuffer method 
+				*/
+				DSBUFFERDESC BufferDescription = {};
+				BufferDescription.dwSize = sizeof(BufferDescription);
+				BufferDescription.dwFlags = DSBCAPS_PRIMARYBUFFER;
+
+				/*
+				IDirectSound8::CreateSoundBuffer Method
+				The CreateSoundBuffer method creates a sound buffer object to 
+				manage audio samples.
+				*/
+				LPDIRECTSOUND3DBUFFER PrimaryBuffer;
+				if (SUCCEEDED(DirectSound->CreateSoundBuffer(&BufferDescription, &PrimaryBuffer, 0)))
+				{
+					
+					if (SUCCEEDED(PrimaryBuffer->SetFormat(&WaveFormat)))
+					{
+						//set format
+					}
+					else
+					{
+						//diog
+					}
+				}
+				else
+				{
+					//diog
+				}
+			}
+			else
+			{
+				//diog
+			}
+
+
+			DSBUFFERDESC BufferDescription = {};
+			BufferDescription.dwSize = sizeof(BufferDescription);
+			BufferDescription.dwFlags = 0;
+			BufferDescription.dwBufferBytes = BufferSize;
+			BufferDescription.lpwfxFormat = &WaveFormat;
+			/*
+			IDirectSound8::CreateSoundBuffer Method
+			The CreateSoundBuffer method creates a sound buffer object to
+			manage audio samples.
+			*/
+			LPDIRECTSOUND3DBUFFER SecondaryBuffer;
+			if (SUCCEEDED(DirectSound->CreateSoundBuffer(&BufferDescription, &SecondaryBuffer, 0)))
+			{
+
+			}
+		}
+		else
+		{
+			//diog
+		}
+	}
+	else
+	{
+		//diog.
 	}
 }
 
@@ -91,8 +207,8 @@ internal win32WindowDimension getWindowDimension(HWND Window)
 	return (Result);
 }
 
-internal void RenderWeirdGradient(
-	win32OffScreenBuffer *Buffer, int BlueOffSet, int GreenOffSet)
+internal void 
+RenderWeirdGradient(win32OffScreenBuffer *Buffer, int BlueOffSet, int GreenOffSet)
 {
 
 	uint8 *Row = (uint8 *)Buffer->Memory;
@@ -118,8 +234,8 @@ internal void RenderWeirdGradient(
 }
 
 //Device - Independent Bitmaps
-internal void Win32ResizeDIBSection(win32OffScreenBuffer *Buffer, 
-										int Width, int Height)
+internal void 
+Win32ResizeDIBSection(win32OffScreenBuffer *Buffer, int Width, int Height)
 {
 	//release
 	if (Buffer->Memory)
@@ -150,8 +266,9 @@ internal void Win32ResizeDIBSection(win32OffScreenBuffer *Buffer,
 	//RenderWeirdGradient(128, 0);
 }
 
-internal void Win32UpdateWindow(win32OffScreenBuffer *Buffer, HDC DeviceContext,
-								int WindowWidth, int WindowHeight)
+internal void 
+Win32UpdateWindow(win32OffScreenBuffer *Buffer, HDC DeviceContext, 
+	int WindowWidth, int WindowHeight)
 {
 
 	/*
@@ -267,6 +384,16 @@ LRESULT CALLBACK Win32WindowCallback(
 						OutputDebugStringA("WasDown\n");
 					}
 				}
+				else if (VKCode == VK_SPACE)
+				{
+
+				}
+			}
+
+			bool32 AltKeyWasDown = (lParam & (1 << 29));
+			if ((VKCode == VK_F4) && AltKeyWasDown)
+			{
+				Running = false;
 			}
 		}break;
 
@@ -307,7 +434,7 @@ int CALLBACK WinMain(
 	int       nCmdShow)
 {
 	win32LoadXinput();
-	
+
 	//WNDCLASS structure
 	WNDCLASS WindowClass = {};
 
@@ -320,12 +447,12 @@ int CALLBACK WinMain(
 	WindowClass.lpszClassName = "HandmadeHeroWindowsClass";
 
 	// CreateWindowEx function
-	if (RegisterClass(&WindowClassA))
+	if (RegisterClass(&WindowClass))
 	{
 		HWND Window =
 			CreateWindowEx(
 				0,						//Extended Window Styles
-				WindowClassA.lpszClassName,
+				WindowClass.lpszClassName,
 				"Handmade Hero",			//Title 
 				WS_OVERLAPPEDWINDOW|WS_VISIBLE,
 				CW_USEDEFAULT,				//x position
@@ -342,6 +469,8 @@ int CALLBACK WinMain(
 			int BlueOffSet = 0;
 			int GreenOffSet = 0;
 			
+			Win32InitDSound(Window, 48000, 48000 * sizeof(int16) * 2);
+
 			while (Running)
 			{
 			
