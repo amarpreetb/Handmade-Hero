@@ -483,6 +483,7 @@ int CALLBACK WinMain(
 
 			
 			Win32InitDSound(Window, SamplesPerSecond, SecondaryBufferSize);
+			bool SoundIsPlaying = false;
 			SecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
 
 			while (Running)
@@ -556,6 +557,10 @@ int CALLBACK WinMain(
 					DWORD BytesToLock = RunningSampleIndex * BytesPerSample % SecondaryBufferSize;
 					DWORD BytesToWrite;
 					
+					if (BytesToLock == PlayCursor)
+					{
+						BytesToWrite = SecondaryBufferSize;
+					}
 					
 					if (BytesToLock > PlayCursor)
 					{
@@ -588,7 +593,7 @@ int CALLBACK WinMain(
 							++SampleIndex)
 						{
 							
-							int16 SampleValue = ((RunningSampleIndex++ > HalfSquareWavePeriod) % 2) ? 1600 : -16000;
+							int16 SampleValue = ((RunningSampleIndex++ / HalfSquareWavePeriod) % 2) ? 16000 : -16000;
 							*SampleOut++ = SampleValue;
 							*SampleOut++ = SampleValue;
 							
@@ -600,7 +605,7 @@ int CALLBACK WinMain(
 							++SampleIndex)
 						{
 							
-							int16 SampleValue = ((RunningSampleIndex++ > HalfSquareWavePeriod) % 2) ? 1600 : -16000;
+							int16 SampleValue = ((RunningSampleIndex++ / HalfSquareWavePeriod) % 2) ? 16000 : -16000;
 							*SampleOut++ = SampleValue;
 							*SampleOut++ = SampleValue;
 				
@@ -608,6 +613,12 @@ int CALLBACK WinMain(
 
 						SecondaryBuffer->Unlock(Region1, Region1Size, Region2, Region2Size);
 					}
+				}
+
+				if (!SoundIsPlaying)
+				{
+					SecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
+					SoundIsPlaying = true;
 				}
 				HDC DeviceContext = GetDC(Window);
 				win32WindowDimension Dimension = getWindowDimension(Window);
