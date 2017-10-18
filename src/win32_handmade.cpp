@@ -309,25 +309,25 @@ LRESULT CALLBACK Win32WindowCallback(
 		//Window Notifications
 		case WM_SIZE:
 		{
-			OutputDebugStringA("wm_size\n");//OutputDebugStringA display to debug window
+			//OutputDebugStringA display to debug window
 		}break;
 
 		case WM_DESTROY:
 		{
 			Running = false;
-			OutputDebugStringA("wm_destroy\n");
+			
 		}break;
 
 		case WM_CLOSE:
 		{
 			Running = false;
 			PostQuitMessage(0);
-			OutputDebugStringA("wm_close\n");
+			
 		}break;
 
 		case WM_ACTIVATEAPP:
 		{
-			OutputDebugStringA("wm_activateapp\n");
+			
 		}break;
 
 		case WM_SYSKEYUP:
@@ -430,7 +430,7 @@ LRESULT CALLBACK Win32WindowCallback(
 		default:
 		{
 			Result = DefWindowProc(Window, Message, wParam, lParam);
-			OutputDebugStringA("default\n");
+			
 		}break;
 	}
 	return Result;
@@ -507,6 +507,11 @@ int CALLBACK WinMain(
 	LPSTR     lpCmdLine,
 	int       nCmdShow)
 {
+
+	LARGE_INTEGER PerfCountFreaquancyResult;
+	QueryPerformanceFrequency(&PerfCountFreaquancyResult);
+	int64 PerfCountFrequency = PerfCountFreaquancyResult.QuadPart;
+
 	win32LoadXinput();
 
 	//WNDCLASS structure
@@ -547,7 +552,7 @@ int CALLBACK WinMain(
 
 			SoundOutput.SamplesPerSecond = 48000;
 			SoundOutput.ToneHz = 256; //Cycles per sec
-			SoundOutput.ToneVolume = 3000;
+			SoundOutput.ToneVolume = 3000; //sound volume
 			SoundOutput.RunningSampleIndex = 0;
 			SoundOutput.WavePeriod = SoundOutput.SamplesPerSecond/ SoundOutput.ToneHz;
 			SoundOutput.BytesPerSample = sizeof(int16) * 2;
@@ -557,9 +562,24 @@ int CALLBACK WinMain(
 			Win32FillSoundBuffer(&SoundOutput, 0, SoundOutput.SecondaryBufferSize);
 			GlobalSecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
 
+			Running = true;
+
+			//Represents a 64-bit signed integer value.
+			LARGE_INTEGER LastCounter;
+
+			/*
+			QueryPerformanceCounter function
+			Retrieves the current value of the performance counter, which is a
+			high resolution (<1us) time stamp that can be used for
+			time-interval measurements.
+			*/
+			QueryPerformanceCounter(&LastCounter);
+
+			//rdtsc returns the processor time stamp.
+			int64 LastCycleCount = __rdtsc();
+
 			while (Running)
-			{
-			
+			{			
 				MSG Message;
 
 				while (PeekMessage(&Message, 0, 0, 0, PM_REMOVE))
@@ -628,11 +648,7 @@ int CALLBACK WinMain(
 					DWORD BytesToLock = ((SoundOutput.RunningSampleIndex * SoundOutput.BytesPerSample) % SoundOutput.SecondaryBufferSize);
 					DWORD BytesToWrite;
 					
-					if (BytesToLock == PlayCursor)
-					{
-						BytesToWrite = 0;
-					}
-					else if (BytesToLock > PlayCursor)
+					if (BytesToLock > PlayCursor)
 					{
 						BytesToWrite = (SoundOutput.SecondaryBufferSize - BytesToLock);
 						BytesToWrite += PlayCursor;
@@ -652,6 +668,26 @@ int CALLBACK WinMain(
 
 				++BlueOffSet;
 				//++GreenOffSet;
+
+				int64 EndCycleCount = __rdtsc();
+
+				LARGE_INTEGER EndCounter;
+				QueryPerformanceCounter(&EndCounter);
+
+				int64 CyclesElapsed = EndCycleCount - LastCycleCount;
+				int64 CounterElapsed = EndCounter.QuadPart - LastCounter.QuadPart;
+				int32 msPerFrame = (int32)(((1000 * CounterElapsed) / PerfCountFrequency));
+				//int64 msPerFrame = ((1000 * CounterElapsed) / PerfCountFrequency);
+				int32 FPS = PerfCountFrequency / CounterElapsed;
+				int32 MCPF = (int32)(CyclesElapsed / (1000 * 1000));//megacycles perframe
+
+				char Buffer[256];
+				wsprintf(Buffer, "Millisec/frame: %d  %dFPS  %dCycles/Frame\n", msPerFrame, FPS, MCPF);
+				OutputDebugStringA(Buffer);
+				
+				LastCycleCount = EndCycleCount;
+				LastCounter = EndCounter;
+
 			}
 		}
 		else
