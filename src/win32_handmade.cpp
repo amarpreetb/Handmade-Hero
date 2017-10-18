@@ -40,6 +40,7 @@ struct win32WindowDimension
 //global
 global_variable bool Running;
 global_variable win32OffScreenBuffer GlobalBackBuffer;
+global_variable LPDIRECTSOUNDBUFFER SecondaryBuffer;
 
 //-------------XinputGetState------------
 #define X_INPUT_GET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE *pState)
@@ -112,22 +113,22 @@ internal void Win32InitDSound(HWND Window, int32 SamplesPerSecond, int32 BufferS
 		LPDIRECTSOUND DirectSound;
 		if (DirectSoundCreate && SUCCEEDED(DirectSoundCreate(0, &DirectSound, 0)))
 		{
+			/*
+			WAVEFORMATEX Structure
+			The WAVEFORMATEX structure defines the format
+			of waveform-audio data.
+			*/
+			WAVEFORMATEX WaveFormat;
+			WaveFormat.wFormatTag = WAVE_FORMAT_PCM;
+			WaveFormat.nChannels = 2;
+			WaveFormat.nSamplesPerSec = SamplesPerSecond;
+			WaveFormat.wBitsPerSample = 16;
+			WaveFormat.nBlockAlign = (WaveFormat.nChannels * WaveFormat.wBitsPerSample) / 8;
+			WaveFormat.nAvgBytesPerSec = WaveFormat.nSamplesPerSec * WaveFormat.nBlockAlign;
+			WaveFormat.cbSize = 0;
 
 			if (SUCCEEDED(DirectSound->SetCooperativeLevel(Window, DSSCL_PRIORITY)))
 			{
-				/*
-				WAVEFORMATEX Structure
-				The WAVEFORMATEX structure defines the format
-				of waveform-audio data.
-				*/
-				WAVEFORMATEX WaveFormat;
-				WaveFormat.wFormatTag = WAVE_FORMAT_PCM;
-				WaveFormat.nChannels = 2;
-				WaveFormat.nSamplesPerSec = SamplesPerSecond;
-				WaveFormat.wBitsPerSample = 16;
-				WaveFormat.nBlockAlign = (WaveFormat.nChannels * WaveFormat.wBitsPerSample) / 8;
-				WaveFormat.nAvgBytesPerSec = WaveFormat.nSamplesPerSec * WaveFormat.nBlockAlign;
-				WaveFormat.cbSize = 0;
 
 				/*
 				The DSBUFFERDESC structure describes the characteristics of a 
@@ -146,8 +147,9 @@ internal void Win32InitDSound(HWND Window, int32 SamplesPerSecond, int32 BufferS
 				LPDIRECTSOUNDBUFFER PrimaryBuffer;
 				if (SUCCEEDED(DirectSound->CreateSoundBuffer(&BufferDescription, &PrimaryBuffer, 0)))
 				{
+					HRESULT Error = PrimaryBuffer->SetFormat(&WaveFormat);
 					
-					if (SUCCEEDED(PrimaryBuffer->SetFormat(&WaveFormat)))
+					if (SUCCEEDED(Error))
 					{
 						//set format
 					}
@@ -177,8 +179,9 @@ internal void Win32InitDSound(HWND Window, int32 SamplesPerSecond, int32 BufferS
 			The CreateSoundBuffer method creates a sound buffer object to
 			manage audio samples.
 			*/
+			HRESULT Error = DirectSound->CreateSoundBuffer(&BufferDescription, &SecondaryBuffer, 0);
 			LPDIRECTSOUNDBUFFER SecondaryBuffer;
-			if (SUCCEEDED(DirectSound->CreateSoundBuffer(&BufferDescription, &SecondaryBuffer, 0)))
+			if (SUCCEEDED(Error))
 			{
 
 			}
@@ -466,10 +469,21 @@ int CALLBACK WinMain(
 		if (Window != NULL)
 		{
 			Running = true;
+
+			int SamplesPerSecond = 48000;
 			int BlueOffSet = 0;
 			int GreenOffSet = 0;
+			int Hz = 256; //Cycles per sec
+			uint32 RunningSampleIndex = 0;
+			//int SquareWaveCounter = 0;
+			int SquareWavePeriod = SamplesPerSecond/Hz;
+			int HalfSquareWavePeriod = SquareWavePeriod / 2;
+			int BytesPerSample = sizeof(int16) * 2;
+			int SecondaryBufferSize = SamplesPerSecond * BytesPerSample;
+
 			
-			Win32InitDSound(Window, 48000, 48000 * sizeof(int16) * 2);
+			Win32InitDSound(Window, SamplesPerSecond, SecondaryBufferSize);
+			SecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
 
 			while (Running)
 			{
@@ -517,10 +531,8 @@ int CALLBACK WinMain(
 						int16 StickX = Pad->sThumbLX; //Left thumbstick x-axis value
 						int16 StickY = Pad->sThumbLY; //Left thumbstick x-axis value
 						
-						if (BButton)
-						{
-							GreenOffSet += 2;
-						}
+						//BlueOffSet =+ StickX >> 12;
+						//GreenOffSet =+ StickY >> 12;
 					}
 					else
 					{
@@ -529,9 +541,76 @@ int CALLBACK WinMain(
 					}
 				}
 				RenderWeirdGradient(&GlobalBackBuffer, BlueOffSet, GreenOffSet);
+
+				DWORD PlayCursor;
+				DWORD WriteCursor;
+
+				/*
+				IDirectSoundBuffer8::GetCurrentPosition Method
+				The GetCurrentPosition method retrieves the position of the play 
+				and write cursors in the sound buffer.
+				*/
+				if (SUCCEEDED(SecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor)))
+				{
+
+					DWORD BytesToLock = RunningSampleIndex * BytesPerSample % SecondaryBufferSize;
+					DWORD BytesToWrite;
+					
+					
+					if (BytesToLock > PlayCursor)
+					{
+						BytesToWrite = (SecondaryBufferSize - BytesToLock);
+						BytesToWrite += PlayCursor;
+					}
+					else
+					{
+						BytesToWrite = PlayCursor - BytesToLock;
+					}
+					VOID *Region1;
+					DWORD Region1Size;
+					VOID *Region2;
+					DWORD Region2Size;
+
+					/*
+					IDirectSoundBuffer8::Lock Method
+					The Lock method readies all or part of the buffer for a data
+					write and returns pointers to which data can be written.
+					*/
+					if (SUCCEEDED(SecondaryBuffer->Lock(WriteCursor, BytesToWrite, 
+						&Region1, &Region1Size,
+						&Region2, &Region2Size, 0)))
+					{
+
+						int16 *SampleOut = (int16 *)Region1;
+						DWORD Region1SampleCount = Region1Size / BytesPerSample;
+						for (DWORD SampleIndex = 0;
+							SampleIndex < Region1SampleCount;
+							++SampleIndex)
+						{
+							
+							int16 SampleValue = ((RunningSampleIndex++ > HalfSquareWavePeriod) % 2) ? 1600 : -16000;
+							*SampleOut++ = SampleValue;
+							*SampleOut++ = SampleValue;
+							
+						}
+
+						DWORD Region2SampleCount = Region2Size / BytesPerSample;
+						for (DWORD SampleIndex = 0;
+							SampleIndex < Region2SampleCount;
+							++SampleIndex)
+						{
+							
+							int16 SampleValue = ((RunningSampleIndex++ > HalfSquareWavePeriod) % 2) ? 1600 : -16000;
+							*SampleOut++ = SampleValue;
+							*SampleOut++ = SampleValue;
+				
+						}
+
+						SecondaryBuffer->Unlock(Region1, Region1Size, Region2, Region2Size);
+					}
+				}
 				HDC DeviceContext = GetDC(Window);
 				win32WindowDimension Dimension = getWindowDimension(Window);
-
 				Win32UpdateWindow(&GlobalBackBuffer, DeviceContext, Dimension.Width, Dimension.Height);
 				ReleaseDC(Window, DeviceContext);
 
