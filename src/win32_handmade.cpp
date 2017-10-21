@@ -1,7 +1,5 @@
-#include <windows.h>
+
 #include <stdint.h>
-#include <xinput.h>
-#include <dsound.h>
 #include<math.h>
 //#include <stdio.h>
 //#include <XInput.h>
@@ -27,6 +25,13 @@ typedef double real64;
 #define global_variable static
 
 #define Pi32 3.14159265359f
+
+#include "handmade.cpp"
+
+#include <windows.h>
+#include <stdio.h>
+#include <xinput.h>
+#include <dsound.h>
 
 struct win32OffScreenBuffer
 {
@@ -217,31 +222,6 @@ internal win32WindowDimension getWindowDimension(HWND Window)
 	return (Result);
 }
 
-internal void 
-RenderWeirdGradient(win32OffScreenBuffer *Buffer, int BlueOffSet, int GreenOffSet)
-{
-
-	uint8 *Row = (uint8 *)Buffer->Memory;
-
-	for (int y = 0; y < Buffer->Height; ++y)
-	{
-		uint32 *Pixel = (uint32 *)Row;
-		for (int x = 0; x < Buffer->Width; ++x)
-		{
-			uint8 Blue = (x + BlueOffSet);
-
-			uint8 Green = (y + GreenOffSet);
-
-			*Pixel++ = ((Green << 8) | Blue);
-
-			//somethin weird
-			//uint8 Red = ((x - (GreenOffSet / 2))*(y + (BlueOffSet / 4)) / 8);
-			//*Pixel++ = ((Red << 16) | (Green << 8) | Blue);
-		}
-
-		Row += Buffer->Pitch;
-	}
-}
 
 //Device - Independent Bitmaps
 internal void 
@@ -631,8 +611,15 @@ int CALLBACK WinMain(
 						//not connected
 
 					}
-				}
-				RenderWeirdGradient(&GlobalBackBuffer, BlueOffSet, GreenOffSet);
+                }
+                
+                gameOffScreenBuffer Buffer = {};
+                Buffer.Memory = GlobalBackBuffer.Memory;
+                Buffer.Width = GlobalBackBuffer.Width;
+                Buffer.Height = GlobalBackBuffer.Height;
+                Buffer.Pitch = GlobalBackBuffer.Pitch;
+                gameUpdateAndRender(&Buffer, BlueOffSet, GreenOffSet);
+				//RenderWeirdGradient(&GlobalBackBuffer, BlueOffSet, GreenOffSet);
 
 				DWORD PlayCursor;
 				DWORD WriteCursor;
@@ -680,11 +667,11 @@ int CALLBACK WinMain(
 				//int64 msPerFrame = ((1000 * CounterElapsed) / PerfCountFrequency);
 				int32 FPS = PerfCountFrequency / CounterElapsed;
 				int32 MCPF = (int32)(CyclesElapsed / (1000 * 1000));//megacycles perframe
-
+                /*
 				char Buffer[256];
 				wsprintf(Buffer, "Millisec/frame: %d  %dFPS  %dCycles/Frame\n", msPerFrame, FPS, MCPF);
 				OutputDebugStringA(Buffer);
-				
+				*/
 				LastCycleCount = EndCycleCount;
 				LastCounter = EndCounter;
 
