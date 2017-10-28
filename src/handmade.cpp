@@ -46,11 +46,20 @@ RenderWeirdGradient(gameOffScreenBuffer *Buffer, int XOffset, int YOffset)
 internal void 
 gameUpdateAndRender(game_memory *Memory, game_input *Input,  gameOffScreenBuffer *Buffer, game_SoundOutputBuffer *SoundBuffer)
 {
-    
+    Assert(sizeof(game_state) <= Memory->PermanentStorageSize);
     game_state *GameState = (game_state *)Memory->PermanentStorage;
 
     if (!Memory->IsInitialized)
     {
+        char *Filename = __FILE__;
+
+        debug_read_file_result File = DEBUGPlatformReadEntireFile(Filename); //Read the Enire File
+        if (File.Contents)
+        {
+            DEBUGPlatformWriteEntireFile("test.out", File.ContentsSize, File.Contents);
+            DEBUGPlatformFreeFileMemory(File.Contents);
+        }
+
         GameState->ToneHz = 256;
        
         Memory->IsInitialized = true;

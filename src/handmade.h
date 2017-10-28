@@ -1,9 +1,5 @@
 #if !defined(HANDMADE_H)
 
-/*
-
-*/
-
 #if HANDMADE_SLOW //Performance
 #define Assert(Expression) if(!(Expression)) {*(int *)0 = 0;}
 #else
@@ -16,6 +12,24 @@
 #define Terabytes(Value) (Gigabytes(Value) * 1824)
 
 #define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
+
+inline uint32 SafeTruncateUInt64(uint64 Value)
+{
+    Assert(Value <= 0xFFFFFFFF);
+    uint32 Result = (uint32)Value;
+    return(Result);
+}
+
+//#if HANDMADE_INTERNAL
+struct debug_read_file_result 
+{
+    uint32 ContentsSize;
+    void *Contents;
+};
+internal debug_read_file_result DEBUGPlatformReadEntireFile(char *Filename);
+internal void DEBUGPlatformFreeFileMemory(void *Memory);
+internal bool32 DEBUGPlatformWriteEntireFile(char *Filename, uint32 MemorySize, void *Memory);
+//#endif
 
 struct gameOffScreenBuffer
 {
