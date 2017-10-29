@@ -799,13 +799,35 @@ int CALLBACK WinMain(
 							NewController->StickAverageX = win32ProcessXInputStickValue(Pad->sThumbLX, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
 							NewController->StickAverageY = win32ProcessXInputStickValue(Pad->sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
 
-							real32 X = win32ProcessXInputStickValue(Pad->sThumbLX, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
-							
-							real32 Y = win32ProcessXInputStickValue(Pad->sThumbLY, XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
-					
-							//int16 StickX = (real32)Pad->sThumbLX; //Left thumbstick x-axis value
-							//int16 StickY = (real32)Pad->sThumbLY; //Left thumbstick x-axis value
+							if ((NewController->StickAverageX != 0.0f) || 
+							(NewController->StickAverageY != 0.0f)) 
+							{
+								NewController->IsAnalog = true;
+							}
 
+							if (Pad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN)
+							{
+								NewController->StickAverageY = -1.0f;
+								NewController->IsAnalog = false;
+							}
+
+							if (Pad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN)
+							{
+								NewController->StickAverageY = -1.0f;
+								NewController->IsAnalog = false;
+							}
+
+							if (Pad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN)
+							{
+								NewController->StickAverageX = -1.0f;
+								NewController->IsAnalog = false;
+							}
+
+							if (Pad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN)
+							{
+								NewController->StickAverageX = -1.0f;
+								NewController->IsAnalog = false;
+							}
 							real32 Threshold = 0.5f;
                             Win32ProcessXInputDigitalButton(
                                 (NewController->StickAverageX < -Threshold) ? 1 : 0,
