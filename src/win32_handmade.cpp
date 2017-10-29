@@ -41,6 +41,7 @@ typedef double real64;
 global_variable bool GlobalRunning;
 global_variable win32OffScreenBuffer GlobalBackBuffer;
 global_variable LPDIRECTSOUNDBUFFER GlobalSecondaryBuffer;
+global_variable int64 GlobalPerCountFrequency;
 
 //-------------XinputGetState------------
 #define X_INPUT_GET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE *pState)
@@ -657,6 +658,21 @@ Win32ProcessPendingMessages(game_controller_input *KeyboardController)
 	}
 }
 
+inline LARGE_INTEGER
+Win32GetWallCloack(void)
+{
+	LARGE_INTEGER Result;
+	QueryPerformanceCounter(&Result);
+	return(Result);
+}
+
+inline real32
+Win32GetSecondsElapsed(LARGE_INTEGER Start, LARGE_INTEGER End)
+{
+	real32 Result = ((real32)(End.QuadPart - Start.QuadPart) / (real32)GlobalPerCountFrequency);
+	return (Result);
+}
+
 //entry point
 int CALLBACK WinMain(
 	HINSTANCE hInstance,
@@ -665,9 +681,12 @@ int CALLBACK WinMain(
 	int       nCmdShow)
 {
 
-	LARGE_INTEGER PerfCountFreaquancyResult;
-	QueryPerformanceFrequency(&PerfCountFreaquancyResult);
-	int64 PerfCountFrequency = PerfCountFreaquancyResult.QuadPart;
+	LARGE_INTEGER PerfCountFrequancyResult;
+	QueryPerformanceFrequency(&PerfCountFrequancyResult);
+	GlobalPerCountFrequency = PerfCountFrequancyResult.QuadPart;
+
+	UINT DesiredSchedulerMS = 1;
+	bool32 SleepIsGranular = (timeBeginPeriod(DesiredSchedulerMS) == TIMERR_NOERROR);
 
 	win32LoadXinput();
 
@@ -681,6 +700,10 @@ int CALLBACK WinMain(
 	WindowClass.hInstance = hInstance;
 	//WindowClass.hIcon;
 	WindowClass.lpszClassName = "HandmadeHeroWindowsClass";
+
+	int MonitorRefreshHz = 60;
+	int GameUpdateHz = MonitorRefreshHz / 2;
+	real32 TargetSecondsPerFrame = 1.0f / (real32)GameUpdateHz; //Seconds Elapsed
 
 	// CreateWindowEx function
 	if (RegisterClass(&WindowClass))
@@ -701,7 +724,7 @@ int CALLBACK WinMain(
 				0);
 		if (Window != NULL)
 		{
-			GlobalRunning = true;
+			HDC DeviceContext = GetDC(Window);
 
 			win32SoundOutput SoundOutput = {};
 			SoundOutput.SamplesPerSecond = 48000;
@@ -740,15 +763,7 @@ int CALLBACK WinMain(
 				game_input *OldInput = &Input[1];
 
 				//Represents a 64-bit signed integer value.
-				LARGE_INTEGER LastCounter;
-
-				/*
-				QueryPerformanceCounter function
-				Retrieves the current value of the performance counter, which is a
-				high resolution (<1us) time stamp that can be used for
-				time-interval measurements.
-				*/
-				QueryPerformanceCounter(&LastCounter);
+				LARGE_INTEGER LastCounter = Win32GetWallCloack();
 
 				//rdtsc returns the processor time stamp.
 				int64 LastCycleCount = __rdtsc();
@@ -929,36 +944,53 @@ int CALLBACK WinMain(
 						Win32FillSoundBuffer(&SoundOutput, ByteToLock, BytesToWrite, &SoundBuffer);
 					}
 
-					HDC DeviceContext = GetDC(Window);
+					
+					//ReleaseDC(Window, DeviceContext);
+
+					LARGE_INTEGER WorkCounter = Win32GetWallCloack();
+					real32 WorkSecondsElapsed = Win32GetSecondsElapsed(LastCounter, WorkCounter);
+					
+					real32 SecondsElapsedForFrame = WorkSecondsElapsed;
+
+					if (SecondsElapsedForFrame < TargetSecondsPerFrame)
+					{
+						while (SecondsElapsedForFrame < TargetSecondsPerFrame)
+						{
+							if (SleepIsGranular)
+							{
+								//Suspends the execution of the current thread until the time-out interval elapses.
+								DWORD SleepMS = (DWORD)(1000.0f * (TargetSecondsPerFrame - SecondsElapsedForFrame));
+								Sleep(SleepMS);
+							}
+							SecondsElapsedForFrame = Win32GetSecondsElapsed(LastCounter, Win32GetWallCloack());
+						}
+					}
+					else
+					{
+						//TODO Logging
+					}
+		
 					win32WindowDimension Dimension = getWindowDimension(Window);
 					Win32UpdateWindow(&GlobalBackBuffer, DeviceContext, Dimension.Width, Dimension.Height);
-					ReleaseDC(Window, DeviceContext);
-
-
-
-					int64 EndCycleCount = __rdtsc();
-
-					LARGE_INTEGER EndCounter;
-					QueryPerformanceCounter(&EndCounter);
-
-					uint64 CyclesElapsed = EndCycleCount - LastCycleCount;
-					int64 CounterElapsed = EndCounter.QuadPart - LastCounter.QuadPart;
-					real64 msPerFrame = (((1000.0f * (real64)CounterElapsed) / (real64)PerfCountFrequency));
-					//int64 msPerFrame = ((1000 * CounterElapsed) / PerfCountFrequency);
-					real64 FPS = (real64)PerfCountFrequency / (real64)CounterElapsed;
-					real64 MCPF = ((real64)CyclesElapsed / (1000.0f * 1000.0f));//megacycles perframe
-#if 0
-					char Buffer[256];
-					wsprintf(Buffer, "Millisec/frame: %d  %dFPS  %dCycles/Frame\n", msPerFrame, FPS, MCPF);
-					OutputDebugStringA(Buffer);
-#endif				
-					LastCycleCount = EndCycleCount;
-					LastCounter = EndCounter;
 
 					game_input *Temp = NewInput;
 					NewInput = OldInput;
 					OldInput = Temp;
 
+					uint64 EndCycleCount = __rdtsc();
+					uint64 CyclesElapsed = EndCycleCount - LastCycleCount;
+					LastCycleCount = EndCycleCount;
+
+					real64 FPS = 0.0f;
+					real64 MCPF = ((real64)CyclesElapsed / (1000.0f * 1000.0f));//megacycles perframe
+
+					LARGE_INTEGER EndCounter = Win32GetWallCloack();
+					LastCounter = EndCounter;
+					
+
+					char FPSBuffer[256];
+					//wsprintf(FPSBuffer, "Millisec/frame: %d  %dFPS  %dCycles/Frame\n", msPerFrame, FPS, MCPF);
+					OutputDebugStringA(FPSBuffer);
 				}
 
 			}
