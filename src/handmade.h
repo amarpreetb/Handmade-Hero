@@ -107,7 +107,9 @@ inline game_controller_input *GetController(game_input *Input, int ControllerInd
 
 internal void 
 gameUpdateAndRender(game_memory *Memory, game_input *Input,
-      gameOffScreenBuffer *Buffer, game_SoundOutputBuffer *SoundBuffer);
+      gameOffScreenBuffer *Buffer);
+
+internal void GameGetSoundSamples(game_memory *Memory, game_SoundOutputBuffer *SoundBuffer);
 
 struct game_state 
 {
