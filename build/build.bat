@@ -1,1 +1,1 @@
-cl -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 -DHANDMADE-WIN32=1 -FC -Zi win32_handmade.cpp user32.lib gdi32.lib
+cl -GR -EHa -Oi -wd4201 -wd4100 -wd4189 -wd4800 -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 -DHANDMADE-WIN32=1 -FC -Zi win32_handmade.cpp user32.lib gdi32.lib winmm.lib
