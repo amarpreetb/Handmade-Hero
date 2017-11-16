@@ -1,5 +1,6 @@
 # Handmade-Hero
 
-For reference https://msdn.microsoft.com/en-us/library/windows/desktop/aa906039.aspx
+https://handmadehero.org/
+https://hero.handmade.network/episodes
 
-Day 3 https://davidgow.net/handmadepenguin/ch3.html
+For reference https://msdn.microsoft.com/en-us/library/windows/desktop/aa906039.aspx
