@@ -16,7 +16,8 @@ GameOutputSound(game_state *GameState, game_sound_output_buffer *SoundBuffer, in
         int16 SampleValue = (int16)(SineValue * ToneVolume);
         *SampleOut++ = SampleValue;
         *SampleOut++ = SampleValue;
-
+        
+        //Sound
         GameState->tSine += 2.0f*Pi32*1.0f/(real32)WavePeriod;
         if(GameState->tSine > 2.0f*Pi32)
         {
@@ -44,6 +45,30 @@ RenderWeirdGradient(game_offscreen_buffer *Buffer, int BlueOffset, int GreenOffs
     }
 }
 
+internal void 
+RenderPlayer(game_offscreen_buffer *Buffer, int PlayerX, int PlayerY)
+{
+    uint8 *EndOfBuffer = (uint8 *)Buffer->Memory + Buffer->Pitch*Buffer->Height;
+
+    uint32 Color = 0xFFFFFFFF;
+    int Top = PlayerY;
+    int Bottom = PlayerY+10;
+    for(int X = PlayerX; X < PlayerX+10; ++X)
+    {
+         uint8 *Pixel = ((uint8 *)Buffer->Memory + X*Buffer->BytesPerPixel + Top*Buffer->Pitch);
+        for(int Y = Top; Y < Bottom; ++Y)
+        {
+            if((Pixel >= Buffer->Memory) && ((Pixel +  4) <= EndOfBuffer))
+            {
+                *(uint32 *)Pixel = Color;                
+            }
+
+            Pixel += Buffer->Pitch;
+        }
+    }
+
+}
+
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
     Assert((&Input->Controllers[0].Terminator - &Input->Controllers[0].Buttons[0]) ==
@@ -65,12 +90,13 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
         GameState->ToneHz = 512;
         GameState->tSine = 0.0f;
 
+        GameState->PlayerX = 100;
+        GameState->PlayerY = 100;
+
         Memory->IsInitialized = true;
     }
 
-    for(int ControllerIndex = 0;
-        ControllerIndex < ArrayCount(Input->Controllers);
-        ++ControllerIndex)
+    for(int ControllerIndex = 0; ControllerIndex < ArrayCount(Input->Controllers); ++ControllerIndex)
     {
         game_controller_input *Controller = GetController(Input, ControllerIndex);
         if(Controller->IsAnalog)
@@ -91,15 +117,24 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
             }
         }
 
-        // Input.AButtonEndedDown;
-        // Input.AButtonHalfTransitionCount;
+        GameState->PlayerX += (int)(4.0f*Controller->StickAverageX);
+        GameState->PlayerY -= (int)(4.0f*Controller->StickAverageY);
+
+        if(GameState->tJump > 0)
+        {
+            GameState->PlayerY -= (int)(10.0f*sinf(GameState->tJump));
+        }
+
         if(Controller->ActionDown.EndedDown)
         {
-            GameState->GreenOffset += 1;
+            GameState->tJump = 1.0;
         }
+
+        GameState->tJump -= 0.033f;
     }
     
     RenderWeirdGradient(Buffer, GameState->BlueOffset, GameState->GreenOffset);
+    RenderPlayer(Buffer, GameState->PlayerX, GameState->PlayerY);
 }
 
 extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
