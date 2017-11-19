@@ -607,12 +607,12 @@ internal void Win32BeginInputPlayBack(win32_state *Win32State, int InputPlayingI
     Win32State->InputPlayingIndex = InputPlayingIndex;
 
     char *FileName = "foo.hmi"; //hmi: Handmade Input
-    Win32State->PlaybackHandle = CreateFileA(FileName, GENERIC_WRITE, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
+    Win32State->PlaybackHandle = CreateFileA(FileName, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
 
     DWORD BytesToRead = (DWORD)Win32State->TotalSize;
     Assert(Win32State->TotalSize == BytesToRead);
     DWORD BytesRead;
-    WriteFile(Win32State->RecordingHandle, Win32State->GameMemoryBlock, BytesToRead, &BytesRead, 0);
+    ReadFile(Win32State->RecordingHandle, Win32State->GameMemoryBlock, BytesToRead, &BytesRead, 0);
 }
 
 internal void Win32EndInputPlayBack(win32_state *Win32State)
@@ -639,6 +639,7 @@ internal void Win32PlayBackInput(win32_state *Win32State, game_input *NewInput)
             int PlayingIndex = Win32State->InputPlayingIndex;
             Win32EndInputPlayBack(Win32State);
             Win32BeginInputPlayBack(Win32State, PlayingIndex);
+            ReadFile(Win32State->PlaybackHandle, NewInput, sizeof(*NewInput), &BytesRead, 0);
         }
     }
   

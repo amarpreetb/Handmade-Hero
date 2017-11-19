@@ -122,12 +122,12 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
         if(GameState->tJump > 0)
         {
-            GameState->PlayerY -= (int)(10.0f*sinf(GameState->tJump));
+            GameState->PlayerY += (int)(5.0f*sinf(0.5f*Pi32*GameState->tJump));
         }
 
         if(Controller->ActionDown.EndedDown)
         {
-            GameState->tJump = 1.0;
+            GameState->tJump = 4.0;
         }
 
         GameState->tJump -= 0.033f;
