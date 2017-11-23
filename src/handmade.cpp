@@ -78,9 +78,9 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
     game_state *GameState = (game_state *)Memory->PermanentStorage;
     if(!Memory->IsInitialized)
     {
-        char *Filename = __FILE__;
+        char *FileName = __FILE__;
         
-        debug_read_file_result File = Memory->DEBUGPlatformReadEntireFile(Filename);
+        debug_read_file_result File = Memory->DEBUGPlatformReadEntireFile(FileName);
         if(File.Contents)
         {
             Memory->DEBUGPlatformWriteEntireFile("test.out", File.ContentsSize, File.Contents);
