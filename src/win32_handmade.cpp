@@ -994,7 +994,7 @@ WinMain(HINSTANCE Instance,
     
     WNDCLASSA WindowClass = {};
 
-    Win32ResizeDIBSection(&GlobalBackbuffer, 1280, 720);
+    Win32ResizeDIBSection(&GlobalBackbuffer, 960, 540);
     
     WindowClass.style = CS_HREDRAW|CS_VREDRAW;
     WindowClass.lpfnWndProc = Win32MainWindowCallback;
@@ -1022,11 +1022,11 @@ WinMain(HINSTANCE Instance,
         {
             win32_sound_output SoundOutput = {};
 
-            // TODO(casey): How do we reliably query on this on Windows?
             int MonitorRefreshHz = 60;
             HDC RefreshDC = GetDC(Window);
             int Win32RefreshRate = GetDeviceCaps(RefreshDC, VREFRESH);
             ReleaseDC(Window, RefreshDC);
+
             if(Win32RefreshRate > 1)
             {
                 MonitorRefreshHz = Win32RefreshRate;
@@ -1034,12 +1034,9 @@ WinMain(HINSTANCE Instance,
             real32 GameUpdateHz = (MonitorRefreshHz / 2.0f);
             real32 TargetSecondsPerFrame = 1.0f / (real32)GameUpdateHz;
 
-            // TODO(casey): Make this like sixty seconds?
             SoundOutput.SamplesPerSecond = 48000;
             SoundOutput.BytesPerSample = sizeof(int16)*2;
             SoundOutput.SecondaryBufferSize = SoundOutput.SamplesPerSecond*SoundOutput.BytesPerSample;
-            // TODO(casey): Actually compute this variance and see
-            // what the lowest reasonable value is.
             SoundOutput.SafetyBytes = (int)(((real32)SoundOutput.SamplesPerSecond*(real32)SoundOutput.BytesPerSample / GameUpdateHz)/3.0f);
             Win32InitDSound(Window, SoundOutput.SamplesPerSecond, SoundOutput.SecondaryBufferSize);
             Win32ClearBuffer(&SoundOutput);
@@ -1060,8 +1057,7 @@ WinMain(HINSTANCE Instance,
                 OutputDebugStringA(TextBuffer);
             }
 #endif
-            int16 *Samples = (int16 *)VirtualAlloc(0, SoundOutput.SecondaryBufferSize,
-                                                   MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+            int16 *Samples = (int16 *)VirtualAlloc(0, SoundOutput.SecondaryBufferSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 
             
 #if HANDMADE_INTERNAL
@@ -1117,6 +1113,7 @@ WinMain(HINSTANCE Instance,
                 game_input Input[2] = {};
                 game_input *NewInput = &Input[0];
                 game_input *OldInput = &Input[1];
+                NewInput->SecondsToAdvanceOverUpdate = TargetSecondsPerFrame;
     
                 //Represents a 64-bit signed integer value.
                 LARGE_INTEGER LastCounter = Win32GetWallClock();
