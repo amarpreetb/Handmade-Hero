@@ -1113,7 +1113,6 @@ WinMain(HINSTANCE Instance,
                 game_input Input[2] = {};
                 game_input *NewInput = &Input[0];
                 game_input *OldInput = &Input[1];
-                NewInput->SecondsToAdvanceOverUpdate = TargetSecondsPerFrame;
     
                 //Represents a 64-bit signed integer value.
                 LARGE_INTEGER LastCounter = Win32GetWallClock();
@@ -1133,6 +1132,8 @@ WinMain(HINSTANCE Instance,
                 uint64 LastCycleCount = __rdtsc();
                 while(GlobalRunning)
                 {
+                    NewInput->dtForFrame = TargetSecondsPerFrame;
+                    
                     FILETIME NewDLLWriteTime = Win32GetLastWriteTime(SourceGameCodeDLLFullPath);
 
                     //Compares two file times.
