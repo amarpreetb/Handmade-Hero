@@ -455,12 +455,26 @@ internal void
 Win32DisplayBufferInWindow(win32_offscreen_buffer *Buffer,
                            HDC DeviceContext, int WindowWidth, int WindowHeight)
 {
+    int OffsetX = 230;
+    int OffsetY = 90;
+
+    /*
+    The PatBlt function paints the specified rectangle using the brush that is 
+    currently selected into the specified device context. 
+    The brush color and the surface color or colors are combined by using the specified 
+    raster operation.
+    */
+    PatBlt(DeviceContext, 0, 0, WindowWidth, OffsetY, BLACKNESS);
+    PatBlt(DeviceContext, 0, OffsetY + Buffer->Height, WindowWidth, WindowHeight, BLACKNESS);
+    PatBlt(DeviceContext, 0, 0, OffsetX, WindowHeight, BLACKNESS);
+    PatBlt(DeviceContext, OffsetX + Buffer->Width, 0, WindowWidth, WindowHeight, BLACKNESS);
+
     /*
 	The StretchDIBits function copies the color data for a rectangle of pixels in
 	a DIB, JPEG, or PNG image to the specified destination rectangle. 
 	*/
     StretchDIBits(DeviceContext,
-                  0, 0, Buffer->Width, Buffer->Height,
+                  OffsetX, OffsetY, Buffer->Width, Buffer->Height,
                   0, 0, Buffer->Width, Buffer->Height,
                   Buffer->Memory,
                   &Buffer->Info,
@@ -1133,7 +1147,7 @@ WinMain(HINSTANCE Instance,
                 while(GlobalRunning)
                 {
                     NewInput->dtForFrame = TargetSecondsPerFrame;
-                    
+
                     FILETIME NewDLLWriteTime = Win32GetLastWriteTime(SourceGameCodeDLLFullPath);
 
                     //Compares two file times.
